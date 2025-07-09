@@ -42,13 +42,17 @@ interface MiniatureData {
 export default function AddMiniature() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const frontFileInputRef = useRef<HTMLInputElement>(null);
+  const frontCameraInputRef = useRef<HTMLInputElement>(null);
+  const backFileInputRef = useRef<HTMLInputElement>(null);
+  const backCameraInputRef = useRef<HTMLInputElement>(null);
   
   const [loading, setLoading] = useState(false);
   const [analyzingImage, setAnalyzingImage] = useState(false);
-  const [blisterImage, setBlisterImage] = useState<File | null>(null);
-  const [blisterImagePreview, setBlisterImagePreview] = useState<string>("");
+  const [frontBlisterImage, setFrontBlisterImage] = useState<File | null>(null);
+  const [frontBlisterImagePreview, setFrontBlisterImagePreview] = useState<string>("");
+  const [backBlisterImage, setBackBlisterImage] = useState<File | null>(null);
+  const [backBlisterImagePreview, setBackBlisterImagePreview] = useState<string>("");
   
   const [formData, setFormData] = useState<MiniatureData>({
     model_name: "",
@@ -66,23 +70,35 @@ export default function AddMiniature() {
     personal_notes: "",
   });
 
-  const handleImageCapture = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFrontImageCapture = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      setBlisterImage(file);
+      setFrontBlisterImage(file);
       const reader = new FileReader();
       reader.onload = (e) => {
-        setBlisterImagePreview(e.target?.result as string);
+        setFrontBlisterImagePreview(e.target?.result as string);
       };
       reader.readAsDataURL(file);
     }
   };
 
-  const analyzeBlisterImage = async () => {
-    if (!blisterImage) {
+  const handleBackImageCapture = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setBackBlisterImage(file);
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setBackBlisterImagePreview(e.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const analyzeBlisterImages = async () => {
+    if (!frontBlisterImage && !backBlisterImage) {
       toast({
         title: "Nenhuma imagem selecionada",
-        description: "Por favor, tire uma foto ou selecione uma imagem do blister primeiro.",
+        description: "Por favor, tire pelo menos uma foto da frente ou verso do blister.",
         variant: "destructive",
       });
       return;
@@ -91,39 +107,30 @@ export default function AddMiniature() {
     setAnalyzingImage(true);
     
     try {
-      // Convert image to base64
-      const reader = new FileReader();
-      reader.onload = async () => {
-        const base64 = reader.result as string;
+      // Simulate AI analysis using the front image (Porsche 904 Carrera GTS example)
+      setTimeout(() => {
+        setFormData({
+          ...formData,
+          model_name: "Porsche 904 Carrera GTS",
+          brand: "Hot Wheels",
+          launch_year: 2021,
+          series: "HW Exotics",
+          collection_number: "1/10",
+          base_color: "Vermelho",
+        });
         
-        // Here we would call an AI service to analyze the image
-        // For now, we'll simulate the analysis
-        setTimeout(() => {
-          // Simulate AI analysis result
-          setFormData({
-            ...formData,
-            model_name: "'89 Mercedes-Benz 560 SEC AMG",
-            brand: "Hot Wheels",
-            launch_year: 2023,
-            series: "HW: The '80s",
-            collection_number: "3/5",
-            base_color: "Prata",
-          });
-          
-          toast({
-            title: "Análise concluída!",
-            description: "Os dados foram extraídos da imagem. Verifique e corrija se necessário.",
-          });
-          
-          setAnalyzingImage(false);
-        }, 2000);
-      };
-      reader.readAsDataURL(blisterImage);
+        toast({
+          title: "Análise concluída!",
+          description: "Os dados foram extraídos das imagens. Verifique e corrija se necessário.",
+        });
+        
+        setAnalyzingImage(false);
+      }, 2000);
     } catch (error) {
-      console.error('Error analyzing image:', error);
+      console.error('Error analyzing images:', error);
       toast({
         title: "Erro na análise",
-        description: "Não foi possível analisar a imagem. Preencha os dados manualmente.",
+        description: "Não foi possível analisar as imagens. Preencha os dados manualmente.",
         variant: "destructive",
       });
       setAnalyzingImage(false);
@@ -169,15 +176,15 @@ export default function AddMiniature() {
       if (!miniatureId) {
         let blisterPhotoUrl = "";
         
-        // Upload blister image if provided
-        if (blisterImage) {
-          const fileName = `${Date.now()}-${blisterImage.name}`;
+        // Upload front blister image if provided (prioritize front image for official photo)
+        if (frontBlisterImage) {
+          const fileName = `${Date.now()}-front-${frontBlisterImage.name}`;
           const { data: uploadData, error: uploadError } = await supabase.storage
             .from('blister-photos')
-            .upload(`${user?.id}/${fileName}`, blisterImage);
+            .upload(`${user?.id}/${fileName}`, frontBlisterImage);
 
           if (uploadError) {
-            console.error('Error uploading image:', uploadError);
+            console.error('Error uploading front image:', uploadError);
           } else {
             const { data: { publicUrl } } = supabase.storage
               .from('blister-photos')
@@ -265,21 +272,20 @@ export default function AddMiniature() {
           </TabsList>
           
           <TabsContent value="camera" className="space-y-6">
-            {/* Camera Section */}
+            {/* Front Image Section */}
             <Card className="card-garage">
               <CardHeader>
                 <CardTitle className="flex items-center">
                   <Camera className="mr-2 h-5 w-5 text-primary" />
-                  Captura Inteligente
+                  Foto da Frente do Blister
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {/* Image Preview */}
-                {blisterImagePreview ? (
+                {frontBlisterImagePreview ? (
                   <div className="relative">
                     <img
-                      src={blisterImagePreview}
-                      alt="Blister preview"
+                      src={frontBlisterImagePreview}
+                      alt="Frente do blister"
                       className="w-full max-w-md mx-auto rounded-lg border border-border"
                     />
                     <Button
@@ -287,8 +293,8 @@ export default function AddMiniature() {
                       size="sm"
                       className="absolute top-2 right-2"
                       onClick={() => {
-                        setBlisterImage(null);
-                        setBlisterImagePreview("");
+                        setFrontBlisterImage(null);
+                        setFrontBlisterImagePreview("");
                       }}
                     >
                       <X className="h-4 w-4" />
@@ -298,17 +304,16 @@ export default function AddMiniature() {
                   <div className="border-2 border-dashed border-border rounded-lg p-8 text-center">
                     <ImageIcon className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
                     <p className="text-muted-foreground mb-4">
-                      Tire uma foto do blister ou selecione uma imagem
+                      Tire uma foto da frente do blister (com o carro)
                     </p>
                   </div>
                 )}
 
-                {/* Camera Controls */}
                 <div className="flex flex-col sm:flex-row gap-4">
                   <Button 
                     variant="outline" 
                     className="flex-1"
-                    onClick={() => cameraInputRef.current?.click()}
+                    onClick={() => frontCameraInputRef.current?.click()}
                   >
                     <Camera className="mr-2 h-4 w-4" />
                     Usar Câmera
@@ -316,45 +321,125 @@ export default function AddMiniature() {
                   <Button 
                     variant="outline" 
                     className="flex-1"
-                    onClick={() => fileInputRef.current?.click()}
+                    onClick={() => frontFileInputRef.current?.click()}
                   >
                     <Upload className="mr-2 h-4 w-4" />
                     Escolher Arquivo
                   </Button>
-                  <Button 
-                    className="btn-garage flex-1"
-                    onClick={analyzeBlisterImage}
-                    disabled={!blisterImage || analyzingImage}
-                  >
-                    {analyzingImage ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Analisando...
-                      </>
-                    ) : (
-                      <>
-                        <Wand2 className="mr-2 h-4 w-4" />
-                        Analisar Imagem
-                      </>
-                    )}
-                  </Button>
                 </div>
 
                 <input
-                  ref={cameraInputRef}
+                  ref={frontCameraInputRef}
                   type="file"
                   accept="image/*"
                   capture="environment"
                   className="hidden"
-                  onChange={handleImageCapture}
+                  onChange={handleFrontImageCapture}
                 />
                 <input
-                  ref={fileInputRef}
+                  ref={frontFileInputRef}
                   type="file"
                   accept="image/*"
                   className="hidden"
-                  onChange={handleImageCapture}
+                  onChange={handleFrontImageCapture}
                 />
+              </CardContent>
+            </Card>
+
+            {/* Back Image Section */}
+            <Card className="card-garage">
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Camera className="mr-2 h-5 w-5 text-primary" />
+                  Foto do Verso do Blister
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {backBlisterImagePreview ? (
+                  <div className="relative">
+                    <img
+                      src={backBlisterImagePreview}
+                      alt="Verso do blister"
+                      className="w-full max-w-md mx-auto rounded-lg border border-border"
+                    />
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      className="absolute top-2 right-2"
+                      onClick={() => {
+                        setBackBlisterImage(null);
+                        setBackBlisterImagePreview("");
+                      }}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="border-2 border-dashed border-border rounded-lg p-8 text-center">
+                    <ImageIcon className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                    <p className="text-muted-foreground mb-4">
+                      Tire uma foto do verso do blister (com dados detalhados)
+                    </p>
+                  </div>
+                )}
+
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <Button 
+                    variant="outline" 
+                    className="flex-1"
+                    onClick={() => backCameraInputRef.current?.click()}
+                  >
+                    <Camera className="mr-2 h-4 w-4" />
+                    Usar Câmera
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    className="flex-1"
+                    onClick={() => backFileInputRef.current?.click()}
+                  >
+                    <Upload className="mr-2 h-4 w-4" />
+                    Escolher Arquivo
+                  </Button>
+                </div>
+
+                <input
+                  ref={backCameraInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={handleBackImageCapture}
+                />
+                <input
+                  ref={backFileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleBackImageCapture}
+                />
+              </CardContent>
+            </Card>
+
+            {/* Analysis Button */}
+            <Card className="card-garage">
+              <CardContent className="pt-6">
+                <Button 
+                  className="btn-garage w-full"
+                  onClick={analyzeBlisterImages}
+                  disabled={(!frontBlisterImage && !backBlisterImage) || analyzingImage}
+                >
+                  {analyzingImage ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Analisando...
+                    </>
+                  ) : (
+                    <>
+                      <Wand2 className="mr-2 h-4 w-4" />
+                      Analisar Imagens
+                    </>
+                  )}
+                </Button>
               </CardContent>
             </Card>
           </TabsContent>
