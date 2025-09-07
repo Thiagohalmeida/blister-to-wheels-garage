@@ -1,73 +1,61 @@
-# Welcome to your Lovable project
+# Blister to Wheels Garage
 
-## Project info
+## Sobre o Projeto
 
-**URL**: https://lovable.dev/projects/09db4baa-b854-4f52-ad96-450dc9774a72
+O Blister to Wheels Garage é uma aplicação web para colecionadores de miniaturas de carros (principalmente Hot Wheels) gerenciarem sua coleção. Com esta aplicação, os usuários podem catalogar suas miniaturas, visualizar estatísticas da coleção, e manter um registro organizado de todas as peças.
 
-## How can I edit this code?
+## Tecnologias Utilizadas
 
-There are several ways of editing your application.
-
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/09db4baa-b854-4f52-ad96-450dc9774a72) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
-
-**Edit a file directly in GitHub**
-
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
-
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
+Este projeto é construído com:
 
 - Vite
 - TypeScript
 - React
 - shadcn-ui
 - Tailwind CSS
+- Supabase (Autenticação e Banco de Dados)
+- React Query
+- Tesseract.js (OCR para leitura de embalagens)
 
-## How can I deploy this project?
+## Funcionalidades Principais
 
-Simply open [Lovable](https://lovable.dev/projects/09db4baa-b854-4f52-ad96-450dc9774a72) and click on Share -> Publish.
+- **Dashboard**: Visualize estatísticas da sua coleção
+- **Garage**: Explore e filtre sua coleção de miniaturas
+- **Adicionar Miniatura**: Cadastre novas miniaturas com reconhecimento automático via OCR
+- **Autenticação**: Sistema seguro de login/cadastro
 
-## Can I connect a custom domain to my Lovable project?
+## Como Executar o Projeto
 
-Yes, you can!
+Para executar este projeto localmente, você precisará ter Node.js e npm instalados.
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+```sh
+# Passo 1: Clone o repositório
+git clone https://github.com/Thiagohalmeida/blister-to-wheels-garage.git
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+# Passo 2: Navegue até o diretório do projeto
+cd blister-to-wheels-garage
+
+# Passo 3: Instale as dependências
+npm install
+
+# Passo 4: Inicie o servidor de desenvolvimento
+npm run dev
+```
+
+## Estrutura do Projeto
+
+- `/src`: Código fonte da aplicação
+  - `/components`: Componentes reutilizáveis
+  - `/hooks`: Custom hooks React
+  - `/integrations`: Integrações com serviços externos (Supabase)
+  - `/pages`: Páginas principais da aplicação
+  - `/services`: Serviços da aplicação (OCR, etc)
+  - `/utils`: Funções utilitárias
+
+## Contribuição
+
+Contribuições são bem-vindas! Sinta-se à vontade para abrir issues ou enviar pull requests para melhorar o projeto.
+
+## Licença
+
+Este projeto está licenciado sob a licença MIT.
