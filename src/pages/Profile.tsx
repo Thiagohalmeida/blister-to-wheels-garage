@@ -120,7 +120,7 @@ export default function Profile() {
           instagram: profileData.instagram,
           facebook: profileData.facebook,
           tiktok: profileData.tiktok,
-          updated_at: new Date(),
+          updated_at: new Date().toISOString(),
         }, { onConflict: 'user_id' });
 
       if (error) throw error;
