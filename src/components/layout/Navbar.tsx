@@ -41,9 +41,13 @@ export const Navbar = () => {
             className="flex items-center cursor-pointer" 
             onClick={() => navigate("/")}
           >
-            <Car className="h-8 w-8 text-primary mr-2" />
+            <img 
+              src="/Thumb DIECAST BR - Atualizada.png" 
+              alt="Diecast BR Logo" 
+              className="h-10 w-auto mr-2" 
+            />
             <span className="text-xl font-bold text-gradient">
-              MyDiecast Garage
+              Diecast BR Garage
             </span>
           </div>
 

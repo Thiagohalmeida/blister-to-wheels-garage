@@ -11,17 +11,60 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  Camera, 
-  Upload, 
-  Car, 
-  Save, 
-  Loader2, 
+import {
+  Camera,
+  Upload,
+  Car,
+  Save,
+  Loader2,
   X,
   Image as ImageIcon,
   Wand2
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { extractAllTextFromImage } from "@/services/ocrTesseract";
+import { autoFillByModelOrUpc } from "@/utils/hotwheelsLookup";
+
+// Parser de OCR otimizado:
+function parseMiniatureInfoFromText(text: string) {
+  const normText = text.toUpperCase();
+  const lines = normText.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+
+  // Debug OCR e possíveis nomes/modelos
+  const possibleNames = lines.filter(line =>
+    /^[A-Z0-9 \-]{3,25}$/.test(line) &&
+    !line.includes("HOT WHEELS") &&
+    !line.includes("MATTEL") &&
+    !line.includes("WARNING") &&
+    !line.includes("SEGURANCA") &&
+    !line.match(/(EMPOWERING|MADE IN|INMETRO|INDICADO|FABRICADO|PARTS|FOR AGES|CAUTION|WARNING)/)
+  );
+  console.log("TEXTO OCR BRUTO >>>\n", normText);
+  console.log("Linhas candidatas a nome/modelo:", possibleNames);
+
+  // Nome/modelo
+  const nameMatch = possibleNames[0];
+
+  // Série
+  const seriesMatch = lines.find(line =>
+    /ART|CARS|ART CARS|HW ART CARS/.test(line)
+  );
+
+  // Número da coleção
+  const collectionNumberMatch = normText.match(/(\d{1,3}\s*[\\\/]?\s*\d{1,3})/);
+
+  // UPC
+  const upcMatch = normText.match(/(\d{12,13})/);
+
+  return {
+    model_name: nameMatch ? nameMatch.trim() : "",
+    series: seriesMatch ? seriesMatch.trim() : "",
+    collection_number: collectionNumberMatch
+      ? collectionNumberMatch[0].replace(/\s+/g, '').replace("\\", "/")
+      : "",
+    upc: upcMatch ? upcMatch[1] : "",
+  };
+}
 
 interface MiniatureData {
   model_name: string;
@@ -37,6 +80,7 @@ interface MiniatureData {
   is_treasure_hunt: boolean;
   is_super_treasure_hunt: boolean;
   personal_notes: string;
+  upc?: string;
 }
 
 export default function AddMiniature() {
@@ -46,15 +90,15 @@ export default function AddMiniature() {
   const frontCameraInputRef = useRef<HTMLInputElement>(null);
   const backFileInputRef = useRef<HTMLInputElement>(null);
   const backCameraInputRef = useRef<HTMLInputElement>(null);
-  
+
   const [loading, setLoading] = useState(false);
   const [analyzingImage, setAnalyzingImage] = useState(false);
   const [frontBlisterImage, setFrontBlisterImage] = useState<File | null>(null);
   const [frontBlisterImagePreview, setFrontBlisterImagePreview] = useState<string>("");
   const [backBlisterImage, setBackBlisterImage] = useState<File | null>(null);
   const [backBlisterImagePreview, setBackBlisterImagePreview] = useState<string>("");
-  
-  const [formData, setFormData] = useState<MiniatureData>({
+
+  const emptyForm: MiniatureData = {
     model_name: "",
     brand: "",
     launch_year: null,
@@ -68,8 +112,13 @@ export default function AddMiniature() {
     is_treasure_hunt: false,
     is_super_treasure_hunt: false,
     personal_notes: "",
-  });
+    upc: "",
+  };
+  const [formData, setFormData] = useState<MiniatureData>(emptyForm);
 
+  const resetFormData = () => setFormData(emptyForm);
+
+  // Uploads
   const handleFrontImageCapture = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
@@ -81,7 +130,6 @@ export default function AddMiniature() {
       reader.readAsDataURL(file);
     }
   };
-
   const handleBackImageCapture = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
@@ -94,6 +142,7 @@ export default function AddMiniature() {
     }
   };
 
+  // OCR + auto preenchimento usando o lookup local!
   const analyzeBlisterImages = async () => {
     if (!frontBlisterImage && !backBlisterImage) {
       toast({
@@ -103,37 +152,50 @@ export default function AddMiniature() {
       });
       return;
     }
-
+    resetFormData();
     setAnalyzingImage(true);
-    
     try {
-      // Simulate AI analysis using the front image (Porsche 904 Carrera GTS example)
-      setTimeout(() => {
-        setFormData({
-          ...formData,
-          model_name: "Porsche 904 Carrera GTS",
-          brand: "Hot Wheels",
-          launch_year: 2021,
-          series: "HW Exotics",
-          collection_number: "1/10",
-          base_color: "Vermelho",
-        });
-        
+      const texts: string[] = [];
+      if (frontBlisterImage) texts.push(await extractAllTextFromImage(frontBlisterImage));
+      if (backBlisterImage) texts.push(await extractAllTextFromImage(backBlisterImage));
+      const fullText = texts.join("\n");
+
+      const info = parseMiniatureInfoFromText(fullText);
+
+      // Lookup por modelo/UPC
+      const autoFilled = autoFillByModelOrUpc({
+        model_name: info.model_name?.toUpperCase(),
+        upc: info.upc
+      });
+
+      // Prioridade: OCR > base local (usuário pode editar depois)
+      setFormData(prev => ({
+        ...prev,
+        ...autoFilled,
+        ...info,
+      }));
+
+      setAnalyzingImage(false);
+
+      if ((!info.model_name && !info.upc) && !autoFilled.model_name) {
         toast({
-          title: "Análise concluída!",
-          description: "Os dados foram extraídos das imagens. Verifique e corrija se necessário.",
+          title: "Nenhum dado identificado",
+          description: "A imagem não foi reconhecida, preencha os campos manualmente.",
+          variant: "default",
         });
-        
-        setAnalyzingImage(false);
-      }, 2000);
+      } else {
+        toast({
+          title: "Reconhecimento concluído!",
+          description: "Verifique e complete os campos restantes.",
+        });
+      }
     } catch (error) {
-      console.error('Error analyzing images:', error);
+      setAnalyzingImage(false);
       toast({
         title: "Erro na análise",
-        description: "Não foi possível analisar as imagens. Preencha os dados manualmente.",
+        description: "Falha ao processar a imagem. Preencha manualmente.",
         variant: "destructive",
       });
-      setAnalyzingImage(false);
     }
   };
 
@@ -143,7 +205,6 @@ export default function AddMiniature() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     if (!formData.model_name || !formData.brand) {
       toast({
         title: "Campos obrigatórios",
@@ -152,75 +213,43 @@ export default function AddMiniature() {
       });
       return;
     }
-
     setLoading(true);
-
     try {
-      // First, check if this miniature already exists in master database
-      const { data: existingMiniature, error: searchError } = await supabase
+      let miniatureId: string | undefined;
+      const { data: existingMiniature } = await supabase
         .from('miniatures_master')
         .select('id')
         .eq('model_name', formData.model_name)
         .eq('brand', formData.brand)
-        .eq('launch_year', formData.launch_year || null)
-        .eq('series', formData.series || null)
         .maybeSingle();
 
-      if (searchError) {
-        console.error('Error searching miniature:', searchError);
-      }
-
-      let miniatureId = existingMiniature?.id;
-
-      // If miniature doesn't exist in master database, create it
-      if (!miniatureId) {
-        let blisterPhotoUrl = "";
-        
-        // Upload front blister image if provided (prioritize front image for official photo)
-        if (frontBlisterImage) {
-          const fileName = `${Date.now()}-front-${frontBlisterImage.name}`;
-          const { data: uploadData, error: uploadError } = await supabase.storage
-            .from('blister-photos')
-            .upload(`${user?.id}/${fileName}`, frontBlisterImage);
-
-          if (uploadError) {
-            console.error('Error uploading front image:', uploadError);
-          } else {
-            const { data: { publicUrl } } = supabase.storage
-              .from('blister-photos')
-              .getPublicUrl(uploadData.path);
-            blisterPhotoUrl = publicUrl;
-          }
-        }
-
+      if (existingMiniature) {
+        miniatureId = existingMiniature.id.toString();
+      } else {
         const { data: newMiniature, error: createError } = await supabase
           .from('miniatures_master')
           .insert({
+            upc: formData.upc,
             model_name: formData.model_name,
             brand: formData.brand,
             launch_year: formData.launch_year,
             series: formData.series,
             collection_number: formData.collection_number,
             base_color: formData.base_color,
-            official_blister_photo_url: blisterPhotoUrl,
+            variants: formData.variants,
           })
           .select('id')
           .single();
-
-        if (createError) {
-          throw createError;
-        }
-
-        miniatureId = newMiniature.id;
+        if (createError) throw createError;
+        miniatureId = newMiniature.id.toString();
       }
 
-      // Add miniature to user collection
       const { error: userMiniatureError } = await supabase
         .from('user_miniatures')
         .insert({
-          user_id: user?.id,
+          user_id: user?.id ? user.id.toString() : "",
           miniature_id: miniatureId,
-          acquisition_date: formData.acquisition_date || null,
+          acquisition_date: formData.acquisition_date,
           price_paid: formData.price_paid,
           condition: formData.condition,
           variants: formData.variants,
@@ -228,19 +257,14 @@ export default function AddMiniature() {
           is_super_treasure_hunt: formData.is_super_treasure_hunt,
           personal_notes: formData.personal_notes,
         });
-
-      if (userMiniatureError) {
-        throw userMiniatureError;
-      }
+      if (userMiniatureError) throw userMiniatureError;
 
       toast({
         title: "Miniatura adicionada!",
         description: "Sua nova miniatura foi adicionada à coleção com sucesso.",
       });
-
       navigate('/garage');
     } catch (error: any) {
-      console.error('Error adding miniature:', error);
       toast({
         title: "Erro ao adicionar miniatura",
         description: error.message || "Ocorreu um erro inesperado. Tente novamente.",
@@ -254,7 +278,6 @@ export default function AddMiniature() {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-foreground mb-2">
@@ -270,7 +293,7 @@ export default function AddMiniature() {
             <TabsTrigger value="camera">📸 Fotografar Blister</TabsTrigger>
             <TabsTrigger value="manual">✍️ Preencher Manual</TabsTrigger>
           </TabsList>
-          
+
           <TabsContent value="camera" className="space-y-6">
             {/* Front Image Section */}
             <Card className="card-garage">
@@ -308,18 +331,17 @@ export default function AddMiniature() {
                     </p>
                   </div>
                 )}
-
                 <div className="flex flex-col sm:flex-row gap-4">
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     className="flex-1"
                     onClick={() => frontCameraInputRef.current?.click()}
                   >
                     <Camera className="mr-2 h-4 w-4" />
                     Usar Câmera
                   </Button>
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     className="flex-1"
                     onClick={() => frontFileInputRef.current?.click()}
                   >
@@ -327,7 +349,6 @@ export default function AddMiniature() {
                     Escolher Arquivo
                   </Button>
                 </div>
-
                 <input
                   ref={frontCameraInputRef}
                   type="file"
@@ -382,18 +403,17 @@ export default function AddMiniature() {
                     </p>
                   </div>
                 )}
-
                 <div className="flex flex-col sm:flex-row gap-4">
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     className="flex-1"
                     onClick={() => backCameraInputRef.current?.click()}
                   >
                     <Camera className="mr-2 h-4 w-4" />
                     Usar Câmera
                   </Button>
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     className="flex-1"
                     onClick={() => backFileInputRef.current?.click()}
                   >
@@ -401,7 +421,6 @@ export default function AddMiniature() {
                     Escolher Arquivo
                   </Button>
                 </div>
-
                 <input
                   ref={backCameraInputRef}
                   type="file"
@@ -420,10 +439,10 @@ export default function AddMiniature() {
               </CardContent>
             </Card>
 
-            {/* Analysis Button */}
+            {/* Botão de análise OCR */}
             <Card className="card-garage">
               <CardContent className="pt-6">
-                <Button 
+                <Button
                   className="btn-garage w-full"
                   onClick={analyzeBlisterImages}
                   disabled={(!frontBlisterImage && !backBlisterImage) || analyzingImage}
@@ -440,10 +459,16 @@ export default function AddMiniature() {
                     </>
                   )}
                 </Button>
+                {formData.upc && (
+                  <div className="mt-2 text-sm text-muted-foreground">
+                    UPC detectado: <span className="font-semibold">{formData.upc}</span>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
 
+          {/* Cadastro manual */}
           <TabsContent value="manual">
             <Card className="card-garage">
               <CardHeader>
@@ -461,9 +486,8 @@ export default function AddMiniature() {
           </TabsContent>
         </Tabs>
 
-        {/* Form */}
+        {/* Formulário final */}
         <form onSubmit={handleSubmit} className="space-y-6 mt-6">
-          {/* Basic Info */}
           <Card className="card-garage">
             <CardHeader>
               <CardTitle>Informações Básicas</CardTitle>
@@ -476,7 +500,6 @@ export default function AddMiniature() {
                     id="model_name"
                     value={formData.model_name}
                     onChange={(e) => handleInputChange('model_name', e.target.value)}
-                    placeholder="Ex: '89 Mercedes-Benz 560 SEC AMG"
                     required
                   />
                 </div>
@@ -486,12 +509,10 @@ export default function AddMiniature() {
                     id="brand"
                     value={formData.brand}
                     onChange={(e) => handleInputChange('brand', e.target.value)}
-                    placeholder="Ex: Hot Wheels, Matchbox"
                     required
                   />
                 </div>
               </div>
-
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <Label htmlFor="launch_year">Ano de Lançamento</Label>
@@ -499,8 +520,7 @@ export default function AddMiniature() {
                     id="launch_year"
                     type="number"
                     value={formData.launch_year || ""}
-                    onChange={(e) => handleInputChange('launch_year', e.target.value ? parseInt(e.target.value) : null)}
-                    placeholder="2023"
+                    onChange={e => handleInputChange('launch_year', e.target.value ? parseInt(e.target.value) : null)}
                   />
                 </div>
                 <div>
@@ -509,7 +529,6 @@ export default function AddMiniature() {
                     id="series"
                     value={formData.series}
                     onChange={(e) => handleInputChange('series', e.target.value)}
-                    placeholder="Ex: HW: The '80s"
                   />
                 </div>
                 <div>
@@ -518,24 +537,20 @@ export default function AddMiniature() {
                     id="collection_number"
                     value={formData.collection_number}
                     onChange={(e) => handleInputChange('collection_number', e.target.value)}
-                    placeholder="Ex: 3/5 ou 158/250"
                   />
                 </div>
               </div>
-
               <div>
                 <Label htmlFor="base_color">Cor Principal</Label>
                 <Input
                   id="base_color"
                   value={formData.base_color}
                   onChange={(e) => handleInputChange('base_color', e.target.value)}
-                  placeholder="Ex: Azul, Vermelho, Prata"
                 />
               </div>
             </CardContent>
           </Card>
 
-          {/* User Specific Data */}
           <Card className="card-garage">
             <CardHeader>
               <CardTitle>Dados da sua Coleção</CardTitle>
@@ -558,8 +573,7 @@ export default function AddMiniature() {
                     type="number"
                     step="0.01"
                     value={formData.price_paid || ""}
-                    onChange={(e) => handleInputChange('price_paid', e.target.value ? parseFloat(e.target.value) : null)}
-                    placeholder="5.50"
+                    onChange={e => handleInputChange('price_paid', e.target.value ? parseFloat(e.target.value) : null)}
                   />
                 </div>
                 <div>
@@ -576,18 +590,14 @@ export default function AddMiniature() {
                   </Select>
                 </div>
               </div>
-
               <div>
                 <Label htmlFor="variants">Variantes</Label>
                 <Input
                   id="variants"
                   value={formData.variants}
                   onChange={(e) => handleInputChange('variants', e.target.value)}
-                  placeholder="Ex: Rodas 5SP, Versão ZAMAC"
                 />
               </div>
-
-              {/* Treasure Hunt Checkboxes */}
               <div className="flex flex-col sm:flex-row gap-4">
                 <div className="flex items-center space-x-2">
                   <Checkbox
@@ -606,21 +616,19 @@ export default function AddMiniature() {
                   <Label htmlFor="is_super_treasure_hunt">É um Super Treasure Hunt?</Label>
                 </div>
               </div>
-
               <div>
                 <Label htmlFor="personal_notes">Notas Pessoais</Label>
                 <Textarea
                   id="personal_notes"
                   value={formData.personal_notes}
                   onChange={(e) => handleInputChange('personal_notes', e.target.value)}
-                  placeholder="Adicione suas observações sobre esta miniatura..."
                   rows={3}
                 />
               </div>
             </CardContent>
           </Card>
 
-          {/* Submit Button */}
+          {/* Submit/cancel buttons */}
           <div className="flex flex-col sm:flex-row gap-4">
             <Button
               type="button"

@@ -5,10 +5,10 @@
 
 @layer base {
   :root {
-    --primary: 220 90% 50%;
-    --primary-light: 220 90% 60%;
-    --secondary: 45 100% 60%;
-    --accent: 10 90% 55%;
+    --primary: 210 100% 50%;
+    --primary-light: 210 100% 60%;
+    --secondary: 0 100% 50%;
+    --accent: 0 100% 60%;
     --background: 220 13% 9%;
     --surface: 220 13% 12%;
     --card: 220 13% 11%;
@@ -17,7 +17,7 @@
     --muted: 220 13% 20%;
     --border: 220 13% 20%;
     --input: 220 13% 15%;
-    --ring: 220 90% 50%;
+    --ring: 210 100% 50%;
     --destructive: 0 85% 60%;
     --success: 120 60% 50%;
     --warning: 38 92% 50%;

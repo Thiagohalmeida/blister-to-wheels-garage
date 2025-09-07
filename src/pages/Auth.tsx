@@ -58,7 +58,7 @@ export default function Auth() {
       } else {
         toast({
           title: "Login realizado com sucesso!",
-          description: "Bem-vindo ao MyDiecast Garage",
+          description: "Bem-vindo ao Diecast BR Garage",
         });
       }
     } catch (err: any) {
@@ -123,10 +123,14 @@ export default function Auth() {
       <Card className="w-full max-w-md card-garage">
         <CardHeader className="text-center">
           <div className="flex items-center justify-center mb-4">
-            <Car className="h-12 w-12 text-primary" />
+            <img 
+              src="/Thumb DIECAST BR - Atualizada.png" 
+              alt="Diecast BR Logo" 
+              className="h-16 w-auto" 
+            />
           </div>
           <CardTitle className="text-2xl font-bold text-gradient">
-            MyDiecast Garage
+            Diecast BR Garage
           </CardTitle>
           <CardDescription>
             Sua garagem virtual de miniaturas die-cast
